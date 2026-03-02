@@ -21,6 +21,7 @@ public class OrderEventConsumer {
 
     private final SagaOrchestrationService sagaOrchestrationService;
     private final ObjectMapper objectMapper;
+    // Basic in-memory idempotency store as required. For production, replace with a TTL-backed store.
     private final Set<String> processedMessageIds = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     @KafkaListener(topics = KafkaTopicConstants.INVENTORY_RESERVED,
