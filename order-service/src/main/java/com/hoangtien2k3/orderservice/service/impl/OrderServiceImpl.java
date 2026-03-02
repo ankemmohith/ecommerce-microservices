@@ -16,7 +16,6 @@ import com.hoangtien2k3.orderservice.service.OrderStatusTransitionValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -30,22 +29,16 @@ import java.util.Objects;
 @Service
 public class OrderServiceImpl implements OrderService {
 
-    @Autowired
     private final OrderRepository orderRepository;
 
-    @Autowired
     private final ModelMapper modelMapper;
 
-    @Autowired
     private final CallAPI callAPI;
 
-    @Autowired
     private final OrderStatusHistoryService orderStatusHistoryService;
 
-    @Autowired
     private final OrderStatusTransitionValidator orderStatusTransitionValidator;
 
-    @Autowired
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
 
     @Override
@@ -159,8 +152,9 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public Mono<List<OrderStatusHistoryDto>> getStatusHistory(Integer orderId) {
         return Mono.fromSupplier(() -> {
-            orderRepository.findById(orderId)
-                    .orElseThrow(() -> new OrderNotFoundException(String.format("Order with id: %d not found", orderId)));
+            if (!orderRepository.existsById(orderId)) {
+                throw new OrderNotFoundException(String.format("Order with id: %d not found", orderId));
+            }
             return orderStatusHistoryRepository.findByOrderOrderIdOrderByChangedAtAsc(orderId)
                     .stream()
                     .map(history -> OrderStatusHistoryDto.builder()
@@ -188,6 +182,7 @@ public class OrderServiceImpl implements OrderService {
             Order order = OrderMappingHelper.map(orderDto);
             OrderStatus newStatus = order.getStatus() == null ? OrderStatus.PENDING : order.getStatus();
             orderStatusTransitionValidator.validateTransition(null, newStatus);
+            order.setStatus(newStatus);
             Order saved = orderRepository.save(order);
             orderStatusHistoryService.saveHistory(saved, null, saved.getStatus(),
                     OrderStatusTrigger.SYSTEM, null);
