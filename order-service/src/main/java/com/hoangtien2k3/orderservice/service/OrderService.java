@@ -1,6 +1,7 @@
 package com.hoangtien2k3.orderservice.service;
 
 import com.hoangtien2k3.orderservice.dto.order.OrderDto;
+import com.hoangtien2k3.orderservice.dto.order.OrderStatusHistoryDto;
 import org.springframework.data.domain.Page;
 import reactor.core.publisher.Mono;
 
@@ -22,4 +23,9 @@ public interface OrderService {
     Mono<Void> deleteById(final Integer orderId);
 
     Boolean existsByOrderId(Integer orderId);
+
+    Mono<OrderDto> cancelOrder(Integer orderId, String reason);
+
+    Mono<List<OrderStatusHistoryDto>> getStatusHistory(Integer orderId);
 }
+

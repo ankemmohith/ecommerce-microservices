@@ -22,6 +22,15 @@ spring:
 
   kafka:
     bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
+    consumer:
+      group-id: order-service-group
+      auto-offset-reset: earliest
+    producer:
+      retries: 3
+
+order:
+  kafka:
+    consumer-group-id: order-service-group
 
   mvc:
     pathmatch:
