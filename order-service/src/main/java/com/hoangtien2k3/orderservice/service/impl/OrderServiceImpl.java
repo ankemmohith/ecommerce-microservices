@@ -22,7 +22,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
-import java.util.Objects;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -198,7 +197,7 @@ public class OrderServiceImpl implements OrderService {
         modelMapper.map(orderDto, existingOrderDto);
         existingOrderDto.setStatus(nextStatus);
         Order savedOrder = orderRepository.save(OrderMappingHelper.map(existingOrderDto));
-        if (!Objects.equals(previousStatus, nextStatus)) {
+        if (previousStatus != nextStatus) {
             orderStatusHistoryService.saveHistory(savedOrder, previousStatus, nextStatus,
                     OrderStatusTrigger.USER, null);
         }

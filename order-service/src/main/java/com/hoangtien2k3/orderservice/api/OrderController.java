@@ -153,8 +153,7 @@ public class OrderController {
                                                                               @Valid final Integer orderId) {
         log.info("*** OrderStatusHistoryDto List, controller; fetch order status history *");
         return orderService.getStatusHistory(orderId)
-                .map(ResponseEntity::ok)
-                .defaultIfEmpty(ResponseEntity.ok(Collections.emptyList()));
+                .map(ResponseEntity::ok);
     }
 
 
