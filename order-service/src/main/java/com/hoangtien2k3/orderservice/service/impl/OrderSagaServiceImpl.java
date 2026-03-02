@@ -33,7 +33,9 @@ public class OrderSagaServiceImpl implements OrderSagaService {
     private final OrderEventProducer orderEventProducer;
     private final ObjectMapper objectMapper;
 
-    // Idempotency: track processed message IDs
+    // Idempotency: track processed message IDs to prevent duplicate processing.
+    // NOTE: This in-memory set does not survive service restarts. For production,
+    // replace with a persistent store (e.g., database table) for durable idempotency.
     private final Set<String> processedMessageIds = ConcurrentHashMap.newKeySet();
 
     @Override
@@ -115,8 +117,8 @@ public class OrderSagaServiceImpl implements OrderSagaService {
         saga.setUpdatedAt(Instant.now());
         orderSagaRepository.save(saga);
 
-        // Update order status to PAYMENT_FAILED
-        updateOrderStatus(saga.getOrderId(), OrderStatus.PAYMENT_FAILED, "SAGA", "Inventory reservation failed: " + reason);
+        // Update order status to CANCELLED (inventory was never reserved, so cancel the order)
+        updateOrderStatus(saga.getOrderId(), OrderStatus.CANCELLED, "SAGA", "Inventory reservation failed: " + reason);
         log.info("Saga {}: inventory failed, saga marked as FAILED", sagaId);
     }
 
@@ -243,7 +245,10 @@ public class OrderSagaServiceImpl implements OrderSagaService {
             return objectMapper.writeValueAsString(msg);
         } catch (Exception e) {
             log.error("Error building message", e);
-            return "{\"sagaId\":\"" + sagaId + "\",\"orderId\":" + orderId + ",\"action\":\"" + action + "\"}";
+            // Fallback with a unique messageId to maintain idempotency
+            String messageId = UUID.randomUUID().toString();
+            return "{\"sagaId\":\"" + sagaId + "\",\"orderId\":" + orderId
+                    + ",\"action\":\"" + action + "\",\"messageId\":\"" + messageId + "\"}";
         }
     }
 

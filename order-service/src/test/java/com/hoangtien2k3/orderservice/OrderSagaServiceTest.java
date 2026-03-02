@@ -179,6 +179,11 @@ class OrderSagaServiceTest {
         ArgumentCaptor<OrderSaga> sagaCaptor = ArgumentCaptor.forClass(OrderSaga.class);
         verify(orderSagaRepository).save(sagaCaptor.capture());
         assertThat(sagaCaptor.getValue().getStatus()).isEqualTo(SagaStatus.FAILED);
+
+        // Order should be CANCELLED (inventory failure = order cancelled, no payment attempted)
+        ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(orderCaptor.capture());
+        assertThat(orderCaptor.getValue().getStatus()).isEqualTo(OrderStatus.CANCELLED);
     }
 
     @Test
