@@ -188,7 +188,7 @@ class OrderServiceIntegrationTest {
     }
 
     @Test
-    void testTransitionToSameStatusDoesNotCreateHistory() {
+    void testTransitionToSameStatusSkipsHistoryRecording() {
         // Given
         Cart cart = Cart.builder()
                 .userId(1)
@@ -215,11 +215,9 @@ class OrderServiceIntegrationTest {
         Order unchangedOrder = orderRepository.findById(orderId).orElseThrow();
         assertEquals(OrderStatus.PENDING, unchangedOrder.getStatus());
 
-        // And: History is still recorded (though status didn't change)
+        // And: No history is recorded
         List<OrderStatusHistory> history = statusHistoryRepository.findByOrderIdOrderByChangedAtAsc(orderId);
-        assertEquals(1, history.size());
-        assertEquals(OrderStatus.PENDING, history.get(0).getPreviousStatus());
-        assertEquals(OrderStatus.PENDING, history.get(0).getNewStatus());
+        assertEquals(0, history.size());
     }
 
 }

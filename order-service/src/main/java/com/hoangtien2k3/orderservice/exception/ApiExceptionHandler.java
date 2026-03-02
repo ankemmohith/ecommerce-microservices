@@ -87,7 +87,7 @@ public class ApiExceptionHandler {
                         IllegalStateException.class
         })
         public <T extends RuntimeException> ResponseEntity<ExceptionMessage> handleApiSaveDatabaseException(final T e) {
-                log.info("**ApiExceptionHandler controller, handle API save database");
+                log.info("**ApiExceptionHandler controller, handle API save database*\n");
 
                 return new ResponseEntity<>(ExceptionMessage.builder()
                                 .message("#### " + e.getMessage() + "! ####")

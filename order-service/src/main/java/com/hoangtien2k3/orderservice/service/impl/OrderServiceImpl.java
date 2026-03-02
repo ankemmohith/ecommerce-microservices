@@ -29,19 +29,14 @@ import java.util.List;
 @Service
 public class OrderServiceImpl implements OrderService {
 
-    @Autowired
     private final OrderRepository orderRepository;
 
-    @Autowired
     private final ModelMapper modelMapper;
 
-    @Autowired
     private final CallAPI callAPI;
 
-    @Autowired
     private final OrderStatusTransitionValidator statusTransitionValidator;
 
-    @Autowired
     private final OrderStatusHistoryService statusHistoryService;
 
     @Override
@@ -164,6 +159,12 @@ public class OrderServiceImpl implements OrderService {
                             String.format("Order with id: %d not found", orderId)));
             
             OrderStatus previousStatus = order.getStatus();
+            
+            // Skip if status hasn't changed
+            if (previousStatus == newStatus) {
+                log.info("Order {} status already {}, skipping update", orderId, newStatus);
+                return OrderMappingHelper.map(order);
+            }
             
             // Validate transition
             statusTransitionValidator.validateTransition(previousStatus, newStatus);
