@@ -149,7 +149,7 @@ public class OrderController {
     @GetMapping("/{orderId}/status-history")
     @PreAuthorize("hasAuthority('ADMIN') or hasAuthority('USER')")
     public Mono<ResponseEntity<List<OrderStatusHistoryDto>>> getStatusHistory(@PathVariable("orderId")
-                                                                              @NotBlank(message = "Input must not be blank")
+                                                                              @NotBlank(message = "Order ID must not be blank")
                                                                               @Valid final String orderId) {
         log.info("*** OrderStatusHistoryDto List, controller; fetch order status history *");
         return orderService.getStatusHistory(Integer.parseInt(orderId))

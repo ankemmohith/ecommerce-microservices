@@ -5,7 +5,6 @@ import com.hoangtien2k3.orderservice.dto.order.OrderStatusHistoryDto;
 import com.hoangtien2k3.orderservice.entity.Order;
 import com.hoangtien2k3.orderservice.entity.OrderStatus;
 import com.hoangtien2k3.orderservice.entity.OrderStatusTrigger;
-import com.hoangtien2k3.orderservice.exception.wrapper.CartNotFoundException;
 import com.hoangtien2k3.orderservice.exception.wrapper.OrderNotFoundException;
 import com.hoangtien2k3.orderservice.helper.OrderMappingHelper;
 import com.hoangtien2k3.orderservice.repository.OrderRepository;
@@ -187,7 +186,7 @@ public class OrderServiceImpl implements OrderService {
         }
         if (existingOrder == null) {
             if (requireExisting) {
-                throw new CartNotFoundException("Cart with id " + orderId + " not found");
+                throw new OrderNotFoundException("Order with id " + orderId + " not found");
             }
             Order order = OrderMappingHelper.map(orderDto);
             OrderStatus newStatus = order.getStatus() == null ? OrderStatus.PENDING : order.getStatus();
