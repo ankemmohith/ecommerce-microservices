@@ -54,5 +54,14 @@ public final class Order extends AbstractMappedEntity {
     @JoinColumn(name = "cart_id")
     private Cart cart;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status")
+    @Builder.Default
+    private OrderStatus status = OrderStatus.PENDING;
+
+    @Version
+    @Column(name = "version")
+    private Long version;
+
 }
 

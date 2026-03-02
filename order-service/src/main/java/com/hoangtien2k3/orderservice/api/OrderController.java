@@ -1,7 +1,9 @@
 package com.hoangtien2k3.orderservice.api;
 
 import com.hoangtien2k3.orderservice.dto.order.OrderDto;
+import com.hoangtien2k3.orderservice.entity.OrderStatusHistory;
 import com.hoangtien2k3.orderservice.service.OrderService;
+import com.hoangtien2k3.orderservice.service.OrderStatusHistoryService;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
@@ -29,6 +31,7 @@ import java.util.List;
 public class OrderController {
 
     private final OrderService orderService;
+    private final OrderStatusHistoryService orderStatusHistoryService;
 
     @ApiOperation(value = "Get all orders", notes = "Retrieve a list of all orders.")
     @ApiResponses({
@@ -144,6 +147,21 @@ public class OrderController {
     @GetMapping("/existOrderId")
     public Boolean existsByOrderId(Integer orderId) {
         return orderService.existsByOrderId(orderId);
+    }
+
+    @ApiOperation(value = "Get order status history", notes = "Retrieve status history for an order.")
+    @ApiResponses({
+            @ApiResponse(code = 200, message = "Status history retrieved successfully", response = List.class),
+            @ApiResponse(code = 404, message = "Order not found", response = ResponseEntity.class)
+    })
+    @GetMapping("/{orderId}/status-history")
+    @PreAuthorize("hasAuthority('ADMIN') or hasAuthority('USER')")
+    public ResponseEntity<List<OrderStatusHistory>> getOrderStatusHistory(@PathVariable("orderId")
+                                                                          @NotBlank(message = "Input must not be blank")
+                                                                          @Valid final String orderId) {
+        log.info("*** OrderStatusHistory List, resource; fetch status history for order {} *", orderId);
+        List<OrderStatusHistory> history = orderStatusHistoryService.getOrderStatusHistory(Integer.parseInt(orderId));
+        return ResponseEntity.ok(history);
     }
 
 }

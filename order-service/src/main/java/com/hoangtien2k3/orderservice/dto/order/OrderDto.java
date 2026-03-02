@@ -9,6 +9,7 @@ import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateTimeDeserializer;
 import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
 import com.hoangtien2k3.orderservice.constrant.AppConstant;
 import com.hoangtien2k3.orderservice.dto.product.ProductDto;
+import com.hoangtien2k3.orderservice.entity.OrderStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -48,5 +49,7 @@ public class OrderDto implements Serializable {
     @JsonProperty("cart")
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private CartDto cartDto;
+
+    private OrderStatus status;
 
 }

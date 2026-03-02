@@ -1,18 +1,24 @@
 package com.hoangtien2k3.orderservice.service.impl;
 
 import com.hoangtien2k3.orderservice.dto.order.OrderDto;
+import com.hoangtien2k3.orderservice.entity.Order;
+import com.hoangtien2k3.orderservice.entity.OrderStatus;
+import com.hoangtien2k3.orderservice.entity.TriggeredBy;
 import com.hoangtien2k3.orderservice.exception.wrapper.CartNotFoundException;
 import com.hoangtien2k3.orderservice.exception.wrapper.OrderNotFoundException;
 import com.hoangtien2k3.orderservice.helper.OrderMappingHelper;
 import com.hoangtien2k3.orderservice.repository.OrderRepository;
 import com.hoangtien2k3.orderservice.service.CallAPI;
 import com.hoangtien2k3.orderservice.service.OrderService;
+import com.hoangtien2k3.orderservice.service.OrderStatusHistoryService;
+import com.hoangtien2k3.orderservice.service.OrderStatusTransitionValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -31,6 +37,12 @@ public class OrderServiceImpl implements OrderService {
 
     @Autowired
     private final CallAPI callAPI;
+
+    @Autowired
+    private final OrderStatusTransitionValidator statusTransitionValidator;
+
+    @Autowired
+    private final OrderStatusHistoryService statusHistoryService;
 
     @Override
     public Mono<List<OrderDto>> findAll() {
@@ -138,6 +150,34 @@ public class OrderServiceImpl implements OrderService {
     public Mono<Void> deleteById(final Integer orderId) {
         log.info("Void, service; delete order by id");
         return Mono.fromRunnable(() -> orderRepository.deleteById(orderId));
+    }
+
+    @Override
+    @Transactional
+    public Mono<OrderDto> updateOrderStatus(Integer orderId, OrderStatus newStatus, 
+                                           TriggeredBy triggeredBy, String metadata) {
+        log.info("Updating order {} status to {}", orderId, newStatus);
+        
+        return Mono.fromCallable(() -> {
+            Order order = orderRepository.findById(orderId)
+                    .orElseThrow(() -> new OrderNotFoundException(
+                            String.format("Order with id: %d not found", orderId)));
+            
+            OrderStatus previousStatus = order.getStatus();
+            
+            // Validate transition
+            statusTransitionValidator.validateTransition(previousStatus, newStatus);
+            
+            // Update status
+            order.setStatus(newStatus);
+            Order savedOrder = orderRepository.save(order);
+            
+            // Record status history
+            statusHistoryService.recordStatusChange(
+                    orderId, previousStatus, newStatus, triggeredBy, metadata);
+            
+            return OrderMappingHelper.map(savedOrder);
+        });
     }
 
 }
