@@ -127,9 +127,6 @@ public class OrderServiceImpl implements OrderService {
         log.info("OrderDto, service; save order");
         return Mono.fromSupplier(() -> {
                     Order order = OrderMappingHelper.map(orderDto);
-                    if (order.getStatus() == null) {
-                        order.setStatus(OrderStatus.PENDING);
-                    }
                     Order savedOrder = orderRepository.save(order);
                     orderStatusHistoryService.saveHistory(savedOrder, null, savedOrder.getStatus(),
                             OrderStatusTrigger.SYSTEM, null);
@@ -191,7 +188,6 @@ public class OrderServiceImpl implements OrderService {
             Order order = OrderMappingHelper.map(orderDto);
             OrderStatus newStatus = order.getStatus() == null ? OrderStatus.PENDING : order.getStatus();
             orderStatusTransitionValidator.validateTransition(null, newStatus);
-            order.setStatus(newStatus);
             Order saved = orderRepository.save(order);
             orderStatusHistoryService.saveHistory(saved, null, saved.getStatus(),
                     OrderStatusTrigger.SYSTEM, null);

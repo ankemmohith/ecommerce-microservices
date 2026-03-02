@@ -149,10 +149,10 @@ public class OrderController {
     @GetMapping("/{orderId}/status-history")
     @PreAuthorize("hasAuthority('ADMIN') or hasAuthority('USER')")
     public Mono<ResponseEntity<List<OrderStatusHistoryDto>>> getStatusHistory(@PathVariable("orderId")
-                                                                              @NotBlank(message = "Order ID must not be blank")
-                                                                              @Valid final String orderId) {
+                                                                              @NotNull(message = "Order ID must not be null")
+                                                                              @Valid final Integer orderId) {
         log.info("*** OrderStatusHistoryDto List, controller; fetch order status history *");
-        return orderService.getStatusHistory(Integer.parseInt(orderId))
+        return orderService.getStatusHistory(orderId)
                 .map(ResponseEntity::ok)
                 .defaultIfEmpty(ResponseEntity.ok(Collections.emptyList()));
     }
