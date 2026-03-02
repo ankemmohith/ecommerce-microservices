@@ -170,13 +170,13 @@ public class OrderServiceImpl implements OrderService {
         });
     }
 
-    private OrderDto updateExistingOrder(Integer orderId, OrderDto orderDto, boolean requireExisting) {
+    private OrderDto updateExistingOrder(Integer orderId, OrderDto orderDto, boolean mustExist) {
         Order existingOrder = null;
         if (orderId != null) {
             existingOrder = orderRepository.findById(orderId).orElse(null);
         }
         if (existingOrder == null) {
-            if (requireExisting) {
+            if (mustExist) {
                 throw new OrderNotFoundException("Order with id " + orderId + " not found");
             }
             Order order = OrderMappingHelper.map(orderDto);
@@ -190,9 +190,9 @@ public class OrderServiceImpl implements OrderService {
         }
         OrderDto existingOrderDto = OrderMappingHelper.map(existingOrder);
         OrderStatus previousStatus = existingOrderDto.getStatus();
-        OrderStatus nextStatus = orderDto.getStatus() != null ? orderDto.getStatus() : previousStatus;
+        OrderStatus nextStatus = orderDto.getStatus();
         if (nextStatus == null) {
-            nextStatus = OrderStatus.PENDING;
+            nextStatus = previousStatus == null ? OrderStatus.PENDING : previousStatus;
         }
         orderStatusTransitionValidator.validateTransition(previousStatus, nextStatus);
         modelMapper.map(orderDto, existingOrderDto);
