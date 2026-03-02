@@ -50,6 +50,14 @@ public final class Order extends AbstractMappedEntity {
     @Column(name = "product_id")
     private Integer productId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 50)
+    private OrderStatus status;
+
+    @Version
+    @Column(name = "version")
+    private Long version;
+
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "cart_id")
     private Cart cart;

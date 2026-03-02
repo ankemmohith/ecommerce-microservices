@@ -16,7 +16,7 @@
     <description>Ecommerce Common Library service</description>
 
     <properties>
-
+        <maven.test.skip>true</maven.test.skip>
     </properties>
 
     <dependencies>

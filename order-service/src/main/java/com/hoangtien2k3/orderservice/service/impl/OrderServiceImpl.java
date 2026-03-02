@@ -1,12 +1,18 @@
 package com.hoangtien2k3.orderservice.service.impl;
 
 import com.hoangtien2k3.orderservice.dto.order.OrderDto;
+import com.hoangtien2k3.orderservice.entity.Order;
+import com.hoangtien2k3.orderservice.entity.OrderStatus;
+import com.hoangtien2k3.orderservice.entity.OrderStatusHistory;
 import com.hoangtien2k3.orderservice.exception.wrapper.CartNotFoundException;
+import com.hoangtien2k3.orderservice.exception.wrapper.InvalidStateTransitionException;
 import com.hoangtien2k3.orderservice.exception.wrapper.OrderNotFoundException;
 import com.hoangtien2k3.orderservice.helper.OrderMappingHelper;
 import com.hoangtien2k3.orderservice.repository.OrderRepository;
+import com.hoangtien2k3.orderservice.repository.OrderStatusHistoryRepository;
 import com.hoangtien2k3.orderservice.service.CallAPI;
 import com.hoangtien2k3.orderservice.service.OrderService;
+import com.hoangtien2k3.orderservice.service.SagaOrchestrationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
@@ -16,6 +22,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
@@ -31,6 +38,12 @@ public class OrderServiceImpl implements OrderService {
 
     @Autowired
     private final CallAPI callAPI;
+
+    @Autowired
+    private final OrderStatusHistoryRepository orderStatusHistoryRepository;
+
+    @Autowired
+    private final SagaOrchestrationService sagaOrchestrationService;
 
     @Override
     public Mono<List<OrderDto>> findAll() {
@@ -109,7 +122,32 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public Mono<OrderDto> save(final OrderDto orderDto) {
         log.info("OrderDto, service; save order");
-        return Mono.fromSupplier(() -> OrderMappingHelper.map(orderRepository.save(OrderMappingHelper.map(orderDto))))
+        return Mono.fromSupplier(() -> {
+                    // Set default status to PENDING for new orders
+                    if (orderDto.getStatus() == null) {
+                        orderDto.setStatus(OrderStatus.PENDING);
+                    }
+                    Order savedOrder = orderRepository.save(OrderMappingHelper.map(orderDto));
+                    // Record initial status history
+                    orderStatusHistoryRepository.save(OrderStatusHistory.builder()
+                            .orderId(savedOrder.getOrderId())
+                            .toStatus(OrderStatus.PENDING)
+                            .changedAt(LocalDateTime.now())
+                            .changedBy("SYSTEM")
+                            .reason("Order created")
+                            .build());
+                    return savedOrder;
+                })
+                .map(OrderMappingHelper::map)
+                .flatMap(savedDto -> {
+                    // Start saga asynchronously
+                    try {
+                        sagaOrchestrationService.startSaga(savedDto.getOrderId());
+                    } catch (Exception e) {
+                        log.error("Failed to start saga for order {}: {}", savedDto.getOrderId(), e.getMessage());
+                    }
+                    return Mono.just(savedDto);
+                })
                 .onErrorResume(throwable -> {
                     log.error("Error saving order: {}", throwable.getMessage());
                     return Mono.error(throwable);
@@ -140,4 +178,65 @@ public class OrderServiceImpl implements OrderService {
         return Mono.fromRunnable(() -> orderRepository.deleteById(orderId));
     }
 
+    @Override
+    public Mono<OrderDto> cancelOrder(Integer orderId) {
+        log.info("OrderDto, service; cancel order {}", orderId);
+        return Mono.fromSupplier(() -> {
+            Order order = orderRepository.findById(orderId)
+                    .orElseThrow(() -> new OrderNotFoundException(
+                            String.format("Order with id: %d not found", orderId)));
+
+            OrderStatus currentStatus = order.getStatus();
+            if (currentStatus != null && !currentStatus.canTransitionTo(OrderStatus.CANCELLED)) {
+                throw new InvalidStateTransitionException(
+                        String.format("Cannot cancel order %d in status %s", orderId, currentStatus));
+            }
+
+            OrderStatus fromStatus = order.getStatus();
+            order.setStatus(OrderStatus.CANCELLED);
+            orderRepository.save(order);
+
+            orderStatusHistoryRepository.save(OrderStatusHistory.builder()
+                    .orderId(orderId)
+                    .fromStatus(fromStatus)
+                    .toStatus(OrderStatus.CANCELLED)
+                    .changedAt(LocalDateTime.now())
+                    .changedBy("USER")
+                    .reason("User requested cancellation")
+                    .build());
+
+            return OrderMappingHelper.map(order);
+        });
+    }
+
+    @Override
+    public Mono<OrderDto> transitionStatus(Integer orderId, OrderStatus newStatus) {
+        log.info("OrderDto, service; transition order {} to status {}", orderId, newStatus);
+        return Mono.fromSupplier(() -> {
+            Order order = orderRepository.findById(orderId)
+                    .orElseThrow(() -> new OrderNotFoundException(
+                            String.format("Order with id: %d not found", orderId)));
+
+            OrderStatus currentStatus = order.getStatus();
+            if (currentStatus != null && !currentStatus.canTransitionTo(newStatus)) {
+                throw new InvalidStateTransitionException(
+                        String.format("Invalid transition from %s to %s for order %d",
+                                currentStatus, newStatus, orderId));
+            }
+
+            order.setStatus(newStatus);
+            orderRepository.save(order);
+
+            orderStatusHistoryRepository.save(OrderStatusHistory.builder()
+                    .orderId(orderId)
+                    .fromStatus(currentStatus)
+                    .toStatus(newStatus)
+                    .changedAt(LocalDateTime.now())
+                    .changedBy("API")
+                    .reason("Manual status transition")
+                    .build());
+
+            return OrderMappingHelper.map(order);
+        });
+    }
 }

@@ -2,6 +2,7 @@ package com.hoangtien2k3.orderservice.exception;
 
 import com.hoangtien2k3.orderservice.exception.payload.ExceptionMessage;
 import com.hoangtien2k3.orderservice.exception.wrapper.CartNotFoundException;
+import com.hoangtien2k3.orderservice.exception.wrapper.InvalidStateTransitionException;
 import com.hoangtien2k3.orderservice.exception.wrapper.JwtAuthenticationException;
 import com.hoangtien2k3.orderservice.exception.wrapper.OrderNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -62,6 +63,20 @@ public class ApiExceptionHandler {
                                                                 .now(ZoneId.systemDefault()))
                                                 .build(),
                                 badRequest);
+        }
+
+        @ExceptionHandler(value = {InvalidStateTransitionException.class})
+        public ResponseEntity<ExceptionMessage> handleInvalidStateTransition(
+                        final InvalidStateTransitionException e) {
+                log.info("**ApiExceptionHandler controller, handle invalid state transition*\n");
+                final var conflict = HttpStatus.CONFLICT;
+                return new ResponseEntity<>(
+                                ExceptionMessage.builder()
+                                                .message("#### " + e.getMessage() + "! ####")
+                                                .httpStatus(conflict)
+                                                .timestamp(ZonedDateTime.now(ZoneId.systemDefault()))
+                                                .build(),
+                                conflict);
         }
 
         @ExceptionHandler(value = {

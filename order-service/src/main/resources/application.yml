@@ -22,6 +22,19 @@ spring:
 
   kafka:
     bootstrap-servers: ${KAFKA_SERVERS:localhost:9092}
+    consumer:
+      group-id: order-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      retries: 3
+
+order:
+  kafka:
+    consumer-group-id: order-service-group
 
   mvc:
     pathmatch:
