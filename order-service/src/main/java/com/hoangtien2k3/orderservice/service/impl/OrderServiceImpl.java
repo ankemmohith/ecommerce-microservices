@@ -1,36 +1,45 @@
 package com.hoangtien2k3.orderservice.service.impl;
 
 import com.hoangtien2k3.orderservice.dto.order.OrderDto;
-import com.hoangtien2k3.orderservice.exception.wrapper.CartNotFoundException;
+import com.hoangtien2k3.orderservice.dto.order.OrderStatusHistoryDto;
+import com.hoangtien2k3.orderservice.entity.Order;
+import com.hoangtien2k3.orderservice.entity.OrderStatus;
+import com.hoangtien2k3.orderservice.entity.OrderStatusTrigger;
 import com.hoangtien2k3.orderservice.exception.wrapper.OrderNotFoundException;
 import com.hoangtien2k3.orderservice.helper.OrderMappingHelper;
 import com.hoangtien2k3.orderservice.repository.OrderRepository;
+import com.hoangtien2k3.orderservice.repository.OrderStatusHistoryRepository;
 import com.hoangtien2k3.orderservice.service.CallAPI;
 import com.hoangtien2k3.orderservice.service.OrderService;
+import com.hoangtien2k3.orderservice.service.OrderStatusHistoryService;
+import com.hoangtien2k3.orderservice.service.OrderStatusTransitionValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
+import java.util.Objects;
 
 @Slf4j
 @RequiredArgsConstructor
 @Service
 public class OrderServiceImpl implements OrderService {
 
-    @Autowired
     private final OrderRepository orderRepository;
 
-    @Autowired
     private final ModelMapper modelMapper;
 
-    @Autowired
     private final CallAPI callAPI;
+
+    private final OrderStatusHistoryService orderStatusHistoryService;
+
+    private final OrderStatusTransitionValidator orderStatusTransitionValidator;
+
+    private final OrderStatusHistoryRepository orderStatusHistoryRepository;
 
     @Override
     public Mono<List<OrderDto>> findAll() {
@@ -109,7 +118,13 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public Mono<OrderDto> save(final OrderDto orderDto) {
         log.info("OrderDto, service; save order");
-        return Mono.fromSupplier(() -> OrderMappingHelper.map(orderRepository.save(OrderMappingHelper.map(orderDto))))
+        return Mono.fromSupplier(() -> {
+                    Order order = OrderMappingHelper.map(orderDto);
+                    Order savedOrder = orderRepository.save(order);
+                    orderStatusHistoryService.saveHistory(savedOrder, null, savedOrder.getStatus(),
+                            OrderStatusTrigger.SYSTEM, null);
+                    return OrderMappingHelper.map(savedOrder);
+                })
                 .onErrorResume(throwable -> {
                     log.error("Error saving order: {}", throwable.getMessage());
                     return Mono.error(throwable);
@@ -119,25 +134,75 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public Mono<OrderDto> update(final OrderDto orderDto) {
         log.info("OrderDto, service; update order");
-        return Mono.fromSupplier(() -> orderRepository.save(OrderMappingHelper.map(orderDto)))
-                .map(OrderMappingHelper::map);
+        return Mono.fromSupplier(() -> updateExistingOrder(orderDto.getOrderId(), orderDto, false));
     }
 
     @Override
     public Mono<OrderDto> update(final Integer orderId, final OrderDto orderDto) {
         log.info("OrderDto, service; update order with orderId");
-        return findById(orderId).flatMap(existingOrderDto -> {
-                    modelMapper.map(orderDto, existingOrderDto);
-                    return Mono.fromSupplier(() -> orderRepository.save(OrderMappingHelper.map(existingOrderDto)))
-                            .map(OrderMappingHelper::map);
-                })
-                .switchIfEmpty(Mono.error(new CartNotFoundException("Cart with id " + orderId + " not found")));
+        return Mono.fromSupplier(() -> updateExistingOrder(orderId, orderDto, true));
     }
 
     @Override
     public Mono<Void> deleteById(final Integer orderId) {
         log.info("Void, service; delete order by id");
         return Mono.fromRunnable(() -> orderRepository.deleteById(orderId));
+    }
+
+    @Override
+    public Mono<List<OrderStatusHistoryDto>> getStatusHistory(Integer orderId) {
+        return Mono.fromSupplier(() -> {
+            if (!orderRepository.existsById(orderId)) {
+                throw new OrderNotFoundException(String.format("Order with id: %d not found", orderId));
+            }
+            return orderStatusHistoryRepository.findByOrderOrderIdOrderByChangedAtAsc(orderId)
+                    .stream()
+                    .map(history -> OrderStatusHistoryDto.builder()
+                            .id(history.getId())
+                            .orderId(history.getOrderId())
+                            .previousStatus(history.getPreviousStatus())
+                            .newStatus(history.getNewStatus())
+                            .changedAt(history.getChangedAt())
+                            .triggeredBy(history.getTriggeredBy())
+                            .metadata(history.getMetadata())
+                            .build())
+                    .toList();
+        });
+    }
+
+    private OrderDto updateExistingOrder(Integer orderId, OrderDto orderDto, boolean mustExist) {
+        Order existingOrder = null;
+        if (orderId != null) {
+            existingOrder = orderRepository.findById(orderId).orElse(null);
+        }
+        if (existingOrder == null) {
+            if (mustExist) {
+                throw new OrderNotFoundException("Order with id " + orderId + " not found");
+            }
+            Order order = OrderMappingHelper.map(orderDto);
+            OrderStatus newStatus = order.getStatus() == null ? OrderStatus.PENDING : order.getStatus();
+            orderStatusTransitionValidator.validateTransition(null, newStatus);
+            order.setStatus(newStatus);
+            Order saved = orderRepository.save(order);
+            orderStatusHistoryService.saveHistory(saved, null, saved.getStatus(),
+                    OrderStatusTrigger.SYSTEM, null);
+            return OrderMappingHelper.map(saved);
+        }
+        OrderDto existingOrderDto = OrderMappingHelper.map(existingOrder);
+        OrderStatus previousStatus = existingOrderDto.getStatus();
+        OrderStatus nextStatus = orderDto.getStatus();
+        if (nextStatus == null) {
+            nextStatus = previousStatus == null ? OrderStatus.PENDING : previousStatus;
+        }
+        orderStatusTransitionValidator.validateTransition(previousStatus, nextStatus);
+        modelMapper.map(orderDto, existingOrderDto);
+        existingOrderDto.setStatus(nextStatus);
+        Order savedOrder = orderRepository.save(OrderMappingHelper.map(existingOrderDto));
+        if (!Objects.equals(previousStatus, nextStatus)) {
+            orderStatusHistoryService.saveHistory(savedOrder, previousStatus, nextStatus,
+                    OrderStatusTrigger.USER, null);
+        }
+        return OrderMappingHelper.map(savedOrder);
     }
 
 }

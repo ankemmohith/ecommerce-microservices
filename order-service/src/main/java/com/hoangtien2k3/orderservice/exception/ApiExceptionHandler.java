@@ -2,6 +2,7 @@ package com.hoangtien2k3.orderservice.exception;
 
 import com.hoangtien2k3.orderservice.exception.payload.ExceptionMessage;
 import com.hoangtien2k3.orderservice.exception.wrapper.CartNotFoundException;
+import com.hoangtien2k3.orderservice.exception.wrapper.InvalidOrderStateException;
 import com.hoangtien2k3.orderservice.exception.wrapper.JwtAuthenticationException;
 import com.hoangtien2k3.orderservice.exception.wrapper.OrderNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -76,6 +77,20 @@ public class ApiExceptionHandler {
                                 .timestamp(ZonedDateTime.now(ZoneId.systemDefault()))
                                 .build(),
                                 HttpStatus.BAD_REQUEST);
+        }
+
+        @ExceptionHandler(value = {
+                        InvalidOrderStateException.class
+        })
+        public <T extends RuntimeException> ResponseEntity<ExceptionMessage> handleInvalidOrderState(final T e) {
+                log.info("**ApiExceptionHandler controller, handle invalid order state");
+
+                return new ResponseEntity<>(ExceptionMessage.builder()
+                                .message("#### " + e.getMessage() + "! ####")
+                                .httpStatus(HttpStatus.CONFLICT)
+                                .timestamp(ZonedDateTime.now(ZoneId.systemDefault()))
+                                .build(),
+                                HttpStatus.CONFLICT);
         }
 
         @ExceptionHandler(Exception.class)
