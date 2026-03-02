@@ -16,6 +16,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import jakarta.persistence.*;
 import java.io.Serial;
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Entity
 @Table(name = "orders")
@@ -50,9 +51,23 @@ public final class Order extends AbstractMappedEntity {
     @Column(name = "product_id")
     private Integer productId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status")
+    private OrderStatus status;
+
+    @Version
+    @Column(name = "version")
+    private Long version;
+
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "cart_id")
     private Cart cart;
 
-}
+    @PrePersist
+    void ensureDefaultStatus() {
+        if (Objects.isNull(status)) {
+            status = OrderStatus.PENDING;
+        }
+    }
 
+}

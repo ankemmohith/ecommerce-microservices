@@ -1,6 +1,7 @@
 package com.hoangtien2k3.orderservice.api;
 
 import com.hoangtien2k3.orderservice.dto.order.OrderDto;
+import com.hoangtien2k3.orderservice.dto.order.OrderStatusHistoryDto;
 import com.hoangtien2k3.orderservice.service.OrderService;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
@@ -138,6 +139,22 @@ public class OrderController {
         return orderService.deleteById(Integer.parseInt(orderId))
                 .thenReturn(ResponseEntity.ok(true))
                 .defaultIfEmpty(ResponseEntity.status(HttpStatus.NOT_FOUND).body(false));
+    }
+
+    @ApiOperation(value = "Get order status history", notes = "Retrieve status history for an order.")
+    @ApiResponses({
+            @ApiResponse(code = 200, message = "Order status history retrieved successfully", response = List.class),
+            @ApiResponse(code = 404, message = "Order not found", response = ResponseEntity.class)
+    })
+    @GetMapping("/{orderId}/status-history")
+    @PreAuthorize("hasAuthority('ADMIN') or hasAuthority('USER')")
+    public Mono<ResponseEntity<List<OrderStatusHistoryDto>>> getStatusHistory(@PathVariable("orderId")
+                                                                              @NotBlank(message = "Input must not be blank")
+                                                                              @Valid final String orderId) {
+        log.info("*** OrderStatusHistoryDto List, controller; fetch order status history *");
+        return orderService.getStatusHistory(Integer.parseInt(orderId))
+                .map(ResponseEntity::ok)
+                .defaultIfEmpty(ResponseEntity.ok(Collections.emptyList()));
     }
 
 
